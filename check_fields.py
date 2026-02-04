@@ -138,7 +138,6 @@ if __name__ == "__main__":
         print("\nPlease update CSV_PATH in this script to point to your COVID data file.")
         exit(1)
     
-    # You can change sample_size to analyze faster
     # Use None to analyze entire file
     results = analyze_columns_for_primary_key(csv_path, sample_size=None)
     

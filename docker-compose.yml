@@ -139,6 +139,23 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  dashboard:
+    build: .
+    container_name: dashboard
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - ${DASHBOARD_PORT}:8501
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+
 networks:
   default:
     name: ${DOCKER_NETWORK}
