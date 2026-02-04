@@ -3,16 +3,15 @@ COVID-19 Analytics Dashboard
 Built with Streamlit
 """
 
+import os
 import streamlit as st
 from sqlalchemy import create_engine
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta, date
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import os
+from datetime import datetime, date
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -32,17 +31,6 @@ st.set_page_config(
 # DATABASE CONNECTION
 # ========================================
 
-
-# @st.cache_resource
-# def get_db_connection():
-#     """Get database connection"""
-#     return psycopg2.connect(
-#         host=os.getenv("POSTGRES_HOST"),
-#         port=os.getenv("POSTGRES_PORT"),
-#         database=os.getenv("POSTGRES_DB"),
-#         user=os.getenv("POSTGRES_USER"),
-#         password=os.getenv("POSTGRES_PASSWORD"),
-#     )
 @st.cache_resource
 def get_engine():
     """Create SQLAlchemy engine"""
@@ -52,6 +40,7 @@ def get_engine():
         f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}"
         f"/{os.getenv('POSTGRES_DB')}"
     )
+
 
 def query_db(sql, params=None):
     """Execute query and return DataFrame"""
@@ -110,14 +99,12 @@ view_type = st.sidebar.selectbox(
         "Overview",
         "National Daily Metrics",
         "State Metrics",
-        "County Hotspots",
-        # "Weekly Summary",
+        "County Hotspots"
     ],
 )
 
 # Date range
 st.sidebar.subheader("📅 Date Range")
-# days_back = st.sidebar.slider("Days to show", 7, 90, 30, 7)
 start_date, end_date = st.sidebar.date_input(
     "Select date range",
     value=(date(2020, 1, 1), date(2022, 6, 30)),
@@ -197,15 +184,6 @@ if view_type == "Overview":
         WHERE metric_date = (SELECT MAX(metric_date) FROM analytics.county_metrics)
     """
     )
-
-    # # Weekly summary - latest
-    # weekly_latest = query_db(
-    #     """
-    #     SELECT total_new_cases, cases_wow_change
-    #     FROM analytics.weekly_summary
-    #     ORDER BY week_start_date DESC LIMIT 1
-    # """
-    # )
 
     with col1:
         if not daily_latest.empty:
@@ -292,7 +270,7 @@ if view_type == "Overview":
                 yaxis={"categoryorder": "total ascending"},
             )
             st.plotly_chart(fig, use_container_width=True)
-    
+
     with col2:
         st.subheader("🏅 Top 10 Counties (Latest)")
         top_counties = query_db(
@@ -915,189 +893,6 @@ elif view_type == "County Hotspots":
         ]
 
         st.dataframe(display_df, hide_index=True, use_container_width=True, height=400)
-
-# ========================================
-# WEEKLY SUMMARY
-# ========================================
-
-# elif view_type == "Weekly Summary":
-#     st.header("📅 Weekly Executive Summary")
-
-#     # Number of weeks to show
-#     weeks_to_show = st.slider("Number of weeks", 4, 12, 8)
-
-#     query = f"""
-#         SELECT 
-#             week_start_date,
-#             week_end_date,
-#             total_new_cases,
-#             total_new_deaths,
-#             cases_wow_change,
-#             deaths_wow_change,
-#             peak_cases_date,
-#             peak_cases_count,
-#             total_states_affected,
-#             total_counties_affected,
-#             avg_cfr
-#         FROM analytics.weekly_summary
-#         ORDER BY week_start_date DESC
-#         LIMIT {weeks_to_show}
-#     """
-#     df = query_db(query)
-
-#     if df.empty:
-#         st.warning("No weekly summary data available")
-#     else:
-#         df = df.sort_values("week_start_date")
-
-#         # Latest week KPIs
-#         latest = df.iloc[-1]
-
-#         col1, col2, col3, col4 = st.columns(4)
-
-#         with col1:
-#             st.metric(
-#                 "Latest Week Cases",
-#                 f"{latest['total_new_cases']:,}",
-#                 f"{latest['cases_wow_change']:.1f}% WoW",
-#                 delta_color="inverse",
-#             )
-
-#         with col2:
-#             st.metric(
-#                 "Latest Week Deaths",
-#                 f"{latest['total_new_deaths']:,}",
-#                 f"{latest['deaths_wow_change']:.1f}% WoW",
-#                 delta_color="inverse",
-#             )
-
-#         with col3:
-#             st.metric(
-#                 "Peak Day",
-#                 (
-#                     latest["peak_cases_date"].strftime("%b %d")
-#                     if pd.notna(latest["peak_cases_date"])
-#                     else "N/A"
-#                 ),
-#                 (
-#                     f"{latest['peak_cases_count']:,} cases"
-#                     if pd.notna(latest["peak_cases_count"])
-#                     else ""
-#                 ),
-#             )
-
-#         with col4:
-#             st.metric(
-#                 "Avg CFR",
-#                 f"{latest['avg_cfr']:.2f}%",
-#                 f"{latest['total_states_affected']} states",
-#             )
-
-#         st.markdown("---")
-
-#         # Weekly trends
-#         col1, col2 = st.columns(2)
-
-#         with col1:
-#             st.subheader("📊 Weekly Cases Trend")
-#             fig = go.Figure()
-
-#             # Bar chart
-#             fig.add_trace(
-#                 go.Bar(
-#                     x=df["week_start_date"],
-#                     y=df["total_new_cases"],
-#                     name="Weekly Cases",
-#                     marker_color="#1f77b4",
-#                     text=df["total_new_cases"],
-#                     texttemplate="%{text:,.0f}",
-#                     textposition="outside",
-#                 )
-#             )
-
-#             fig.update_layout(height=400)
-#             st.plotly_chart(fig, use_container_width=True)
-
-#         with col2:
-#             st.subheader("💀 Weekly Deaths Trend")
-#             fig = go.Figure()
-
-#             fig.add_trace(
-#                 go.Bar(
-#                     x=df["week_start_date"],
-#                     y=df["total_new_deaths"],
-#                     name="Weekly Deaths",
-#                     marker_color="#d62728",
-#                     text=df["total_new_deaths"],
-#                     texttemplate="%{text:,.0f}",
-#                     textposition="outside",
-#                 )
-#             )
-
-#             fig.update_layout(height=400)
-#             st.plotly_chart(fig, use_container_width=True)
-
-#         # Week-over-week changes
-#         st.subheader("📈 Week-over-Week Change (%)")
-
-#         fig = go.Figure()
-
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=df["week_start_date"],
-#                 y=df["cases_wow_change"],
-#                 name="Cases WoW Change",
-#                 mode="lines+markers",
-#                 line=dict(color="blue", width=3),
-#             )
-#         )
-
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=df["week_start_date"],
-#                 y=df["deaths_wow_change"],
-#                 name="Deaths WoW Change",
-#                 mode="lines+markers",
-#                 line=dict(color="red", width=3),
-#             )
-#         )
-
-#         fig.add_hline(y=0, line_dash="dash", line_color="black")
-#         fig.update_layout(height=400, yaxis_title="% Change")
-#         st.plotly_chart(fig, use_container_width=True)
-
-#         # Coverage metrics
-#         col1, col2 = st.columns(2)
-
-#         with col1:
-#             st.subheader("🗺️ States Affected")
-#             fig = px.line(
-#                 df, x="week_start_date", y="total_states_affected", markers=True
-#             )
-#             fig.update_layout(height=300)
-#             st.plotly_chart(fig, use_container_width=True)
-
-#         with col2:
-#             st.subheader("📍 Counties Affected")
-#             fig = px.area(
-#                 df,
-#                 x="week_start_date",
-#                 y="total_counties_affected",
-#                 color_discrete_sequence=["#2ca02c"],
-#             )
-#             fig.update_layout(height=300)
-#             st.plotly_chart(fig, use_container_width=True)
-
-#         # Data table
-#         with st.expander("📋 View Weekly Summary Data"):
-#             display_df = df.copy()
-#             display_df["week_start_date"] = display_df["week_start_date"].dt.strftime(
-#                 "%Y-%m-%d"
-#             )
-#             display_df["week_end_date"] = display_df["week_end_date"].dt.strftime(
-#                 "%Y-%m-%d"
-#             )
-#             st.dataframe(display_df, use_container_width=True)
 
 # ========================================
 # FOOTER
