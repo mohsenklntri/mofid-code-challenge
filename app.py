@@ -31,6 +31,7 @@ st.set_page_config(
 # DATABASE CONNECTION
 # ========================================
 
+
 @st.cache_resource
 def get_engine():
     """Create SQLAlchemy engine"""
@@ -95,21 +96,31 @@ st.sidebar.title("🎛️ Dashboard Controls")
 # View selector
 view_type = st.sidebar.selectbox(
     "📊 Select View",
-    [
-        "Overview",
-        "National Daily Metrics",
-        "State Metrics",
-        "County Hotspots"
-    ],
+    ["Overview", "National Daily Metrics", "State Metrics", "County Hotspots"],
 )
 
 # Date range
+date_bounds = query_db(
+    """
+    SELECT 
+        MIN(metric_date)::date AS min_date,
+        MAX(metric_date)::date AS max_date
+    FROM analytics.daily_national_metrics
+"""
+)
+if not date_bounds.empty:
+    min_date = date_bounds.iloc[0]["min_date"]
+    max_date = date_bounds.iloc[0]["max_date"]
+else:
+    min_date = date(2020, 1, 1)
+    max_date = date.today()
+
 st.sidebar.subheader("📅 Date Range")
 start_date, end_date = st.sidebar.date_input(
     "Select date range",
-    value=(date(2020, 1, 1), date(2022, 6, 30)),
-    min_value=date(2020, 1, 1),
-    max_value=date(2022, 6, 30),
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date,
 )
 
 # Visualization type (for some views)
@@ -160,28 +171,29 @@ if view_type == "Overview":
 
     # Daily metrics - latest
     daily_latest = query_db(
-        """
+        f"""
         SELECT new_cases_total, new_deaths_total, data_quality_score
         FROM analytics.daily_national_metrics
+        WHERE metric_date BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY metric_date DESC LIMIT 1
     """
     )
 
     # State metrics - count
     state_count = query_db(
-        """
+        f"""
         SELECT COUNT(DISTINCT state_name) as count
         FROM analytics.state_metrics
-        WHERE metric_date = (SELECT MAX(metric_date) FROM analytics.state_metrics)
+        WHERE metric_date BETWEEN '{start_date}' AND '{end_date}'
     """
     )
 
     # County metrics - count
     county_count = query_db(
-        """
-        SELECT COUNT(*) as count
+        f"""
+        SELECT COUNT(DISTINCT county_name) as count
         FROM analytics.county_metrics
-        WHERE metric_date = (SELECT MAX(metric_date) FROM analytics.county_metrics)
+        WHERE metric_date BETWEEN '{start_date}' AND '{end_date}'
     """
     )
 
@@ -218,31 +230,6 @@ if view_type == "Overview":
     # Quick visualizations from each table
     col1, col2 = st.columns(2)
 
-    # with col1:
-    #     st.subheader("📈 Last 30 Days - National Trend")
-    #     trend_data = query_db(
-    #         """
-    #         SELECT metric_date, new_cases_total, cases_7day_avg
-    #         FROM analytics.daily_national_metrics
-    #         WHERE metric_date >= CURRENT_DATE - INTERVAL '30 days'
-    #         ORDER BY metric_date
-    #     """
-    #     )
-
-    #     if not trend_data.empty:
-    #         fig = go.Figure()
-    #         fig.add_trace(
-    #             go.Scatter(
-    #                 x=trend_data["metric_date"],
-    #                 y=trend_data["cases_7day_avg"],
-    #                 name="7-Day Average",
-    #                 line=dict(color="#1f77b4", width=3),
-    #                 fill="tozeroy",
-    #             )
-    #         )
-    #         fig.update_layout(height=300, margin=dict(l=0, r=0, t=0, b=0))
-    #         st.plotly_chart(fig, use_container_width=True)
-
     with col1:
         st.subheader("🏅 Top 10 States (Latest)")
         top_states = query_db(
@@ -272,7 +259,7 @@ if view_type == "Overview":
             st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        st.subheader("🏅 Top 10 Counties (Latest)")
+        st.subheader("🎖️ Top 10 Counties (Latest)")
         top_counties = query_db(
             """
             SELECT county_name, new_cases, cases_7day_avg
@@ -298,6 +285,31 @@ if view_type == "Overview":
                 yaxis={"categoryorder": "total ascending"},
             )
             st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("📈 Last 30 Days New Cases 7-Days Avg - National Trend")
+    trend_data = query_db(
+        f"""
+        SELECT metric_date, new_cases_total, cases_7day_avg
+        FROM analytics.daily_national_metrics
+        WHERE metric_date >= (SELECT MAX(metric_date) FROM analytics.daily_national_metrics) - INTERVAL '30 days'
+        ORDER BY metric_date
+    """
+    )
+
+    if not trend_data.empty:
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=trend_data["metric_date"],
+                y=trend_data["cases_7day_avg"],
+                name="7-Day Average",
+                line=dict(color="#1f77b4", width=3),
+                fill="tozeroy",
+            )
+        )
+        fig.update_layout(height=300, margin=dict(l=0, r=0, t=0, b=0))
+        st.plotly_chart(fig, use_container_width=True)
 
     # Table summaries
     st.markdown("---")
