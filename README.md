@@ -47,7 +47,7 @@ And you can visit interactive dashboard web interface at:
 ```arduino
 http://localhost:8501
 ```
->> For full technical details visit `document.pdf` or `document.md` file.
+* For full technical details visit `document.pdf` or `document.md` file.
 
 ## Dashboard Sample Images
 
